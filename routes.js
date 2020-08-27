@@ -11,8 +11,9 @@ module.exports = function(ctx) {
         })
 
     })
-    
+
     server.get('/all', (req, res, next) => {
+        console.log("TESTTESTTESTTEST")
         collection.find({}).toArray(function(err, result) {
             if (err) throw err;
             res.send(200, result)
