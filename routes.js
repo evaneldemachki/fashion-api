@@ -3,12 +3,30 @@ module.exports = function(ctx) {
     const server = ctx.server;
     const collection = db.collection("Items");
 
-    server.get('/category/:category_id', (req, res, next) => {
-        collection.find({"category": req.params.category_id}).toArray(function(err, result) {
-            if (err) throw err;
-            res.send(200, result)
-            next()
-        })
+    server.get('/api/search', (req, res, next) => {
+        let mongo_query = {};
+        let limit;
+        if(req.query.category) {
+            mongo_query["category"] = req.query.category;
+        }
+        if(req.query.gender) {
+            mongo_query["gender"] = req.query.gender;
+        }
+        if(req.query.limit) {
+            limit = parseInt(req.query.limit)
+            collection.find(mongo_query).limit(limit).toArray(function(err, result) {
+                if (err) throw err;
+                res.status(200).send(result);
+                next();
+            })
+        } else {
+            collection.find(mongo_query).toArray(function(err, result) {
+                if (err) throw err;
+                res.status(200).send(result);
+                next();
+            })            
+        }
+
 
     })
 

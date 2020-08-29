@@ -1,0 +1,114 @@
+<script>
+    async function getData(url) {
+        let response = await fetch(url)
+        let data = await response.text()
+        return JSON.parse(data)
+    }
+
+    function getGender() {
+        let fields = document.getElementsByClassName("gender")
+        for(box in fields) {
+            if(fields[box].checked) {
+                fid = fields[box].id
+                if(fid=="uni") {
+                    return false
+                } else {
+                    return {"male": "m", "female": "f"}[fid]
+                }
+            }
+        }
+    }
+
+    function execute_query() {
+        let value = document.getElementById("search-bar").value
+        let gender = getGender()
+        let limit = document.getElementById("limit").value
+
+        let url
+        if(gender) {
+            url = "/api/search?category=" + value + "&gender=" + gender
+        } else {
+            url = "/api/search?category=" + value
+        }
+        if(limit != "") {
+                url += "&limit=" + limit
+        }
+        console.log(url)
+        getData(url).then((data) => {
+            document.getElementById("results").innerHTML = ""
+            for(let item in data) {
+                container = document.createElement("div")
+                container.className = "item"
+
+                anchor = document.createElement("a")
+                anchor.href = data[item].url
+                anchor.target="_blank" 
+                anchor.rel="noopener noreferrer"
+
+                image = document.createElement("img")
+                image.src = data[item].img[0]
+
+                caption = document.createElement("div")
+                caption.className = "caption"
+                caption.innerHTML = data[item].source + "<br>" + data[item].name + "<br>" + data[item].price
+
+                anchor.appendChild(image)
+                container.appendChild(anchor)
+                container.appendChild(caption)
+                document.getElementById("results").appendChild(container)
+            }
+        })
+    }
+</script>
+<html><head><link rel='stylesheet' href='/style.css' /></head><body>
+<div style="width:100%; min-height: 75px; position: relative; box-sizing: border-box; display: block; padding: 0 0 0 10px; margin: 0 0 0 0; overflow: hidden;">
+    <input type="search" id="search-bar" style="position: relative; display: block; float: left; margin: 10px 0 0 10px; width: 400px; height: 50px; font-size: 20;" placeholder="Category..."></input>
+    <div class="check-node">
+        <div class="upper"><input type="checkbox" id="male" class="gender"></input></div>
+        <div class="lower">Men</div>
+    </div>
+    <div class="check-node">
+        <div class="upper"><input type="checkbox" id="female" class="gender"></input></div>
+        <div class="lower">Women</div>
+    </div>
+    <div class="check-node">
+        <div class="upper"><input type="checkbox" id="uni" class="gender"></input></div>
+        <div class="lower">Both</div>
+    </div>
+    <div class="check-node">
+        <div class="upper"><input type="number" value=10 id="limit"></input></div>
+        <div class="lower">Limit</div>
+    </div>
+    <button id="search" style="position: relative; display: block; margin: 10px 0 0 10px; cursor: pointer; float: left; height: 50px; width: 100px; font-size: 20;" onclick="execute_query()">Search</button>
+    
+</div>
+<div id="results" style="position: relative; width: 100%; display: block; box-sizing: border-box; font-size: 30; padding: 10px; margin: 0 0 0 10px; bottom: 0;">
+</div>
+<script>
+
+    (function() {
+        document.getElementById("uni").checked = true
+
+        function applyGender(element) {
+            let gender = element.id
+            let boxes = document.getElementsByClassName("gender")
+            for(box in boxes) {
+                if(boxes[box].id != gender) {
+                    boxes[box].checked = false
+                }
+            }
+        }
+        Array.prototype.forEach.call(document.getElementsByClassName("gender"), element => {
+            element.addEventListener('change', function() {
+                if(this.checked) {
+                    applyGender(this)
+                } else {
+                    document.getElementById("uni").click()
+                    
+                }
+            })
+        })
+    })();
+</script>
+</body>
+</html>
