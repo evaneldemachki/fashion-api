@@ -10,7 +10,7 @@ module.exports = function(ctx) {
         let limit;
         
         // send 400 if any query parameters are not in query_param
-        if(Object.keys(req.query).some((key) => !(key in query_param))) {
+        if(Object.keys(req.query).some((key) => !query_param.includes(key))) {
             res.status(400).send('valid parameters: ["category", "gender", "limit"]');
             next();
         }
@@ -39,7 +39,7 @@ module.exports = function(ctx) {
         let limit;
         
         // send 400 if any query parameters are not in query_param
-        if(Object.keys(req.query).some((key) => !(key in query_param))) {
+        if(Object.keys(req.query).some((key) => !query_param.includes(key))) {
             res.status(400).send('valid parameters: ["category", "gender", "limit"]');
             next();
         }
@@ -52,7 +52,7 @@ module.exports = function(ctx) {
         if(req.query.limit) {
             limit = parseInt(req.query.limit)
         } else {
-            limit = 20
+            limit = 20;
         }
 
         collection.find(mongo_query).limit(limit).toArray(function(err, result) {
