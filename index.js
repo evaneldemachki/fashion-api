@@ -22,7 +22,7 @@ server.listen(config.port, () => {
             config.env
         )
 
-        require('./routes')({ db, server })
+        require('./routes/search')({ db, server })
     })
 
 })
