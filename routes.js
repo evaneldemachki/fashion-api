@@ -24,26 +24,26 @@ module.exports = function(ctx) {
         return mongo_query;
     };
 
-    const parseResults = function(query, result, res, next) {
-        // replace all images with local whale.jpg if devmode="true"
-        if(query.devmode == "true") {
-            for(key in result) {
-                for(img in result[key]["img"]) {
-                    result[key]["img"][img] = "http://fashionapi.herokuapp.com/whale.jpg"
-                }
-            }
-        }
+    const fetchData = function(req, cursor) {
+        let response = new Promise(function(resolve, reject) {
+            cursor.toArray(function(err, res) {
+                if (err) {
+                    reject(err); 
+                } else{
+                    resolve(res);
+                } 
+            });
+        });
 
-        res.status(200).send(result);
-        next();
+        return response;
     }
 
-    server.get('/api/search', (req, res, next) => { 
+    server.get('/api/search', (req, res) => { 
         // send 400 if any query parameters are not in query_param
         if(Object.keys(req.query).some((key) => !query_param.includes(key))) {
-            res.status(400).send("valid parameters: category, gender, limit, name");
-            next();
+            res.status(400).send("ERROR: valid parameters: category, gender, limit, name");
         }
+
         // get request object from query constructor
         let mongo_query = constructQuery(req);
         let limit;
@@ -51,25 +51,42 @@ module.exports = function(ctx) {
         // use default limit if not included in request
         if(req.query.limit) {
             limit = parseInt(req.query.limit);
+            // send 400 non-integer limit parameter
+            if(Number.isNaN(limit)) {
+                res.status(400).send("ERROR: non-integer limit parameter");
+            }
         } else {
             limit = 20;
         }
-        // fetch response
-        let result = collection.find(mongo_query).limit(1000);
+
+        // obtain MongoDB cursor
+        let cursor = collection.find(mongo_query).limit(limit);
+        // project relevance score into results if using text search
         if(req.query.name) {
-            result.project({score: {"$meta": "textScore"}})
-                .toArray((err, result) => parseResults(req.query, result, res, next));
-        } else {
-            result.toArray((err, result) => parseResults(req.query, result, res, next));
+            cursor = cursor.project({score: {"$meta": "textScore"}})
         }
+
+        // fetch response promise
+        fetchData(req, cursor).then((docs) => {
+            // replace all images with local whale.jpg if devmode="true"
+            if(req.query.devmode == "true") {
+                for(key in docs) {
+                    for(img in docs[key]["img"]) {
+                        docs[key]["img"][img] = "http://fashionapi.herokuapp.com/whale.jpg";
+                    }
+                }
+            }
+            res.status(200).send(docs);
+          
+        }).catch(err => res.status(400).send("ERROR: failed to fetch data"));
     });
 
-    server.get('/api/categories', (req, res, next) => {
+    server.get('/api/categories', (req, res) => {
         let result = collection.distinct("category", {}, (function(err, result){
-            if (err) throw err;
+            if(err) {
+                res.status(400).send("ERROR: failed to fetch data")
+            };
             res.status(200).send(result);
-            next();
         }));
-
     });
 }
