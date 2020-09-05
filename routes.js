@@ -22,7 +22,21 @@ module.exports = function(ctx) {
         }
         
         return mongo_query;
-      };
+    };
+
+    const parseResults = function(query, result, res, next) {
+        // replace all images with local whale.jpg if devmode="true"
+        if(query.devmode == "true") {
+            for(key in result) {
+                for(img in result[key]["img"]) {
+                    result[key]["img"][img] = "http://fashionapi.herokuapp.com/whale.jpg"
+                }
+            }
+        }
+
+        res.status(200).send(result);
+        next();
+    }
 
     server.get('/api/search', (req, res, next) => { 
         // send 400 if any query parameters are not in query_param
@@ -41,20 +55,13 @@ module.exports = function(ctx) {
             limit = 20;
         }
         // fetch response
-        collection.find(mongo_query).limit(limit).toArray(function(err, result) {
-            if (err) throw err;
-            // replace all images with local whale.jpg if devmode="true"
-            if(req.query.devmode == "true") {
-                for(key in result) {
-                    for(img in result[key]["img"]) {
-                        result[key]["img"][img] = "http://fashionapi.herokuapp.com/whale.jpg"
-                    }
-                }
-            }
-
-            res.status(200).send(result);
-            next();
-        });
+        let result = collection.find(mongo_query).limit(1000);
+        if(req.query.name) {
+            result.project({score: {"$meta": "textScore"}})
+                .toArray((err, result) => parseResults(req.query, result, res, next));
+        } else {
+            result.toArray((err, result) => parseResults(req.query, result, res, next));
+        }
     });
 
     server.get('/api/categories', (req, res, next) => {
