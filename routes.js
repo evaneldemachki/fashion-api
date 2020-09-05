@@ -16,7 +16,9 @@ module.exports = function(ctx) {
             mongo_query["gender"] = req.query.gender;
         }
         if(req.query.name) {
-            mongo_query["$text"] = { "$search" : req.query.name };
+            mongo_query["$text"] = { 
+                "$search" : req.query.name,
+            };
         }
         
         return mongo_query;
@@ -53,5 +55,14 @@ module.exports = function(ctx) {
             res.status(200).send(result);
             next();
         });
+    });
+
+    server.get('/api/categories', (req, res, next) => {
+        let result = collection.distinct("category", {}, (function(err, result){
+            if (err) throw err;
+            res.status(200).send(result);
+            next();
+        }));
+
     });
 }
