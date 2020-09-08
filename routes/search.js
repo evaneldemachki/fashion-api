@@ -1,6 +1,7 @@
 module.exports = function(ctx) {
     const db = ctx.db.db("Apparel");
     const server = ctx.server;
+    const fetchData = ctx.fetchData;
     const collection = db.collection("Items");
     
     const query_param = ["category", "gender", "limit", "name", "devmode"]
@@ -24,24 +25,11 @@ module.exports = function(ctx) {
         return mongo_query;
     };
 
-    const fetchData = function(req, cursor) {
-        let response = new Promise(function(resolve, reject) {
-            cursor.toArray(function(err, res) {
-                if (err) {
-                    reject(err); 
-                } else{
-                    resolve(res);
-                } 
-            });
-        });
-
-        return response;
-    }
-
     server.get('/api/search', (req, res) => { 
         // send 400 if any query parameters are not in query_param
         if(Object.keys(req.query).some((key) => !query_param.includes(key))) {
             res.status(400).send("ERROR: valid parameters: category, gender, limit, name");
+            return;
         }
 
         // get request object from query constructor
@@ -54,6 +42,7 @@ module.exports = function(ctx) {
             // send 400 non-integer limit parameter
             if(Number.isNaN(limit)) {
                 res.status(400).send("ERROR: non-integer limit parameter");
+                return;
             }
         } else {
             limit = 20;
@@ -67,7 +56,7 @@ module.exports = function(ctx) {
         }
 
         // fetch response promise
-        fetchData(req, cursor).then((docs) => {
+        fetchData(cursor).then((docs) => {
             // replace all images with local whale.jpg if devmode="true"
             if(req.query.devmode == "true") {
                 for(key in docs) {
@@ -77,16 +66,22 @@ module.exports = function(ctx) {
                 }
             }
             res.status(200).send(docs);
+            return;
           
-        }).catch(err => res.status(400).send("ERROR: failed to fetch data"));
+        }).catch(err => {
+            res.status(400).send("ERROR: failed to fetch data");
+            return;
+        });
     });
 
     server.get('/api/categories', (req, res) => {
         let result = collection.distinct("category", {}, (function(err, result){
             if(err) {
-                res.status(400).send("ERROR: failed to fetch data")
+                res.status(400).send("ERROR: failed to fetch data");
+                return;
             };
             res.status(200).send(result);
+            return;
         }));
     });
 }
