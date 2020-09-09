@@ -1,10 +1,10 @@
-const config  = require('./config')
-const express = require("express")
-const router = express.Router()
-const mongodb = require('mongodb').MongoClient
+const config  = require('./config');
+const express = require("express");
+const router = express.Router();
+const mongodb = require('mongodb').MongoClient;
 const bodyParser = require('body-parser');
-const passwordHash = require("password-hash")
-const jwt = require("jsonwebtoken")
+const passwordHash = require("password-hash");
+const jwt = require("jsonwebtoken");
 
 const server = express();
 // java web token configuration
