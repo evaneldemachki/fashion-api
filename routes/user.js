@@ -101,7 +101,8 @@ module.exports = function(ctx) {
             } else {
                 let push_obj = {};
                 push_obj[pkey] = item_id;
-                cursor = data_collection.update({_id: ObjectID(data_id)}, 
+                cursor = data_collection.update(
+                    {_id: ObjectID(data_id)}, 
                     { $push: push_obj },
                     { upsert: false } 
                 );  
@@ -116,6 +117,33 @@ module.exports = function(ctx) {
             }
         });
     }
+
+    server.post('/api/user/get_user_data', (req, res) => {
+        let required = ["token"];
+        if(missingKeys(req.body, required)) {
+            res.status(400).send("ERROR: must include key(s) (token, item_id, action)");
+            return;
+        }
+
+        let token = req.body["token"];
+     
+        jwt.verify(token, jwt_config["secret"], function(err, decoded) {
+            if(!err) {
+                let data_id = decoded["data_id"];
+                let data_collection = db.collection("Data");
+                let cursor = data_collection.find({_id: ObjectID(data_id)});
+                fetchData(cursor).then(docs => {
+                    if(docs.length == 0) {
+                        res.status(400).send("ERROR: user data does not exist");
+                    } else {
+                        res.status(200).send(docs[0]);
+                    }
+                });
+            } else {
+                res.status(400).send("ERROR: an unknown error occured");
+            }
+        });
+    });
 
     server.post('/api/user/product_action', (req, res) => {
         let required = ["token", "item_id", "action"];
@@ -305,9 +333,10 @@ module.exports = function(ctx) {
             if(!err) { // if token verification succeeds, update profile_picture
                 let data_collection = db.collection("Data");
                 let cursor = data_collection.update(
-                    {_id: ObjectID(decoded["data_id"])}, 
-                    {$set: {img: url}},
-                    { upsert: false });
+                    { _id: ObjectID(decoded["data_id"])}, 
+                    { $set: {img: url}},
+                    { upsert: false }
+                );
                 fetchStatus(cursor).then((status) => {
                     if(status["result"]["nModified"] != 1) {
                         throw new Error();
