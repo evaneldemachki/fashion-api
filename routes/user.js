@@ -132,11 +132,35 @@ module.exports = function(ctx) {
                 let data_id = decoded["data_id"];
                 let data_collection = db.collection("Data");
                 let cursor = data_collection.find({_id: ObjectID(data_id)});
-                fetchData(cursor).then(docs => {
+                let docs;
+                let final = {};
+                fetchData(cursor).then(other_docs => {
+                    docs = other_docs;
                     if(docs.length == 0) {
                         res.status(400).send("ERROR: user data does not exist");
                     } else {
-                        res.status(200).send(docs[0]);
+                        final["_id"] = docs[0]["_id"];
+                        final["img"] = docs[0]["img"];
+                        let items_collection = ctx.db.db("Apparel").collection("Items");
+                        cursor = items_collection.find(
+                            {_id: {$in: docs[0]["likes"]}}
+                        );
+                        fetchData(cursor).then(likes => {
+                            final["likes"] = likes;
+                        }).then(() => {
+                            cursor = items_collection.find(
+                                {_id: {$in: docs[0]["dislikes"]}}
+                            );
+                            fetchData(cursor).then(dislikes => {
+                                console.log(dislikes)
+                                final["dislikes"] = dislikes;
+                                res.status(200).send(final);
+                            });
+                        }).catch(err => {
+                            console.log(err);
+                            res.status(400).send("ERROR: an unknown error occured");
+                            return;
+                        });
                     }
                 });
             } else {
