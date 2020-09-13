@@ -1,7 +1,6 @@
-module.exports = function(ctx) {
+module.exports = function(ctx, query) {
     const db = ctx.db.db("Apparel");
     const server = ctx.server;
-    const fetchData = ctx.fetchData;
     const collection = db.collection("Items");
     
     const query_param = ["category", "gender", "limit", "name", "devmode"]
@@ -56,7 +55,7 @@ module.exports = function(ctx) {
         }
 
         // fetch response promise
-        fetchData(cursor).then((docs) => {
+        cursor.toArray().then(docs => {
             // replace all images with local whale.jpg if devmode="true"
             if(req.query.devmode == "true") {
                 for(key in docs) {
@@ -75,7 +74,7 @@ module.exports = function(ctx) {
     });
 
     server.get('/api/categories', (req, res) => {
-        let result = collection.distinct("category", {}, (function(err, result){
+        let result = collection.distinct("category", {}, (function(err, result) {
             if(err) {
                 res.status(400).send("ERROR: failed to fetch data");
                 return;

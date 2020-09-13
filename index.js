@@ -3,34 +3,19 @@ const express = require("express");
 const router = express.Router();
 const mongodb = require('mongodb').MongoClient;
 const bodyParser = require('body-parser');
-const passwordHash = require("password-hash");
-const jwt = require("jsonwebtoken");
+const passport = require('passport');
+
+let Query = require('./query')
 
 const server = express();
-// java web token configuration
-const jwt_config = {
-    "secret": "test-secret",
-    "expire": "24h"
-}
+
 // object id class for mongoDB find by ID
 const ObjectID = require("mongodb").ObjectID;
 
-const fetchData = function(cursor) {
-    let response = new Promise(function(resolve, reject) {
-        cursor.toArray(function(err, res) {
-            if (err) {
-                reject(err); 
-            } else{
-                resolve(res);
-            } 
-        });
-    });
-
-    return response;
-}
-
 server.use(express.static("public"));
 server.use(bodyParser.json());
+server.use(passport.initialize());
+server.use(passport.session());
 
 server.listen(config.port, () => {
     mongodb.connect(config.db.uri, (err, db) => {
@@ -47,14 +32,16 @@ server.listen(config.port, () => {
             config.env
         )
         let imports = { 
-            db, ObjectID,
-            server, 
-            fetchData,
-            passwordHash,
-            jwt, jwt_config
+            db,
+            server,
+            passport
         }
-        require('./routes/search')(imports)
-        require('./routes/user')(imports)
+
+        query = new Query(imports)
+
+        require('./strategy')(passport, query);
+        require('./routes/search')(imports, query)
+        require('./routes/user')(server, query)
     })
 
 })
