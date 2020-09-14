@@ -1,3 +1,5 @@
+const ObjectID = require("mongodb").ObjectID;
+
 module.exports = function(ctx, query) {
     const db = ctx.db.db("Apparel");
     const server = ctx.server;
@@ -23,6 +25,21 @@ module.exports = function(ctx, query) {
         
         return mongo_query;
     };
+
+    server.get('/api/grab', (req, res) => {
+        if(!Object.keys(req.query).includes("item")) {
+            return res.status(400).send("ERROR: item ID not provided");
+        }
+        let cursor = collection.findOne({ _id: ObjectID(req.query.item) });
+        cursor.then(docs => {
+            if(!docs) {
+                return res.status(400).send("ERROR: item not found")
+            }
+            return res.status(200).send(docs);
+        }).catch(err => {
+            return res.status(400).send("ERROR: an unknown error occurred");
+        });
+    });
 
     server.get('/api/search', (req, res) => { 
         // send 400 if any query parameters are not in query_param

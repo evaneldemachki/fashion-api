@@ -9,9 +9,6 @@ let Query = require('./query')
 
 const server = express();
 
-// object id class for mongoDB find by ID
-const ObjectID = require("mongodb").ObjectID;
-
 server.use(express.static("public"));
 server.use(bodyParser.json());
 server.use(passport.initialize());
