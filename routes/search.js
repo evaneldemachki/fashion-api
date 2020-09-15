@@ -5,14 +5,15 @@ module.exports = function(ctx, query) {
     const server = ctx.server;
     const collection = db.collection("Items");
     
-    const query_param = ["category", "gender", "limit", "name", "devmode"]
+    const query_param = ["category", "gender", "limit", "name", "devmode"];
 
     // return MongoDB query given request parameters
     const constructQuery = function(req) {
         let mongo_query = { };
 
         if(req.query.category) {
-            mongo_query["category"] = req.query.category;
+            let categories = req.query.category.split(",");
+            mongo_query["category"] = { $in: categories };
         }
         if(req.query.gender) {
             mongo_query["gender"] = req.query.gender;
