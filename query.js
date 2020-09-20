@@ -129,7 +129,9 @@ module.exports = class Query {
                     return this.db.User.Outfits.insertOne({ _id: outfitID, items });
                 }).then(data => {
                     let insertedCount = data.insertedCount;
-                    resolve(insertedCount);
+                    if(insertedCount > 0) {
+                        resolve(outfitID.toHexString());
+                    } else { reject(); }
                 }).catch(err => {
                     reject(err);
                 });
@@ -151,8 +153,11 @@ module.exports = class Query {
                 { upsert: false }
             )
             .then(data => {
-                let nModified = data.result.nModified;
-                resolve(nModified);
+                if(!data) {
+                    resolve(data);
+                } else {
+                    resolve(data);
+                }
             })
             .catch(err => {
                 reject(err);
