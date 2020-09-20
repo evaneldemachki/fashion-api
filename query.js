@@ -25,6 +25,33 @@ module.exports = class Query {
         });
     }
 
+    fillOutfits(data) {
+        return new Promise((resolve, reject) => {
+            let outfits = [];
+            for(let i = 0; i < data.outfits.length; i++) {
+                outfits.push(ObjectID(data.outfits[i]));
+            }
+            this.db.User.Outfits.find(
+                { _id: { $in: outfits } }
+            ).toArray()
+            .then(res => {
+                for(let i = 0; i < res.length; i++) {
+                    let cursor = this.db.User.Outfits.find(
+                        { _id: { $in: res[i].items } }
+                    );
+                    data.outfits[i] = this.fillWithPromise(res[i], "items", cursor);
+                }
+                Promise.all(res).then(res => {
+                    data.outfits = res;
+                    resolve(data);
+                })
+            })
+            .catch(err => {
+                throw err;
+            })
+        })
+    }
+
     getUserCredentials(username) {
         let promise = new Promise((resolve, reject) => {
             let cursor = this.db.User.Credentials.findOne(
@@ -65,6 +92,9 @@ module.exports = class Query {
                 );
 
                 return this.fillWithPromise(data, "wardrobe", cursor);
+            })
+            .then(data => {
+                return this.fillOutfits(data);
             })
             .then(data => {
                 resolve(data);
