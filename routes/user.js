@@ -86,4 +86,46 @@ module.exports = function(server, query) {
             return res.status(400).send("Item not found");
         });
     });
+
+    server.post('/user/add-outfit', passport.authenticate('jwt', { session: false }),
+    function(req, res) {
+        let dataID = req.user;
+        if(!Object.keys(req.body).includes("items")) {
+            return res.status(400).send("Must provide key: 'items'");
+        }
+        let items = req.body.items;
+        query.addOutfit(dataID, items).then(insertedCount => {
+            if(!insertedCount) {
+                return res.status(400).send("User not found");
+            } else if(insertedCount == 0) {
+                return res.status(400).send("An unknown error occured");
+            }
+            return res.status(200).send("Successfully added outfit");
+        }).catch(err => {
+            return res.status(400).send("An unknown error occured");
+        });
+    });
+
+    server.post('/user/update-outfit', passport.authenticate('jwt', { session: false }),
+    function(req, res) {
+        let dataID = req.user;
+        if(!Object.keys(req.body).includes("outfit")) {
+            return res.status(400).send("Must provide key: 'outfit'");
+        }
+        if(!Object.keys(req.body).includes("items")) {
+            return res.status(400).send("Must provide key: 'items'");
+        }
+        let outfitID = req.body.outfit;
+        let items = req.body.items;
+        query.updateOutfit(outfitID, items).then(nModified => {
+            if(!nModified) {
+                return res.status(400).send("User not found");
+            } else if(nModified == 0) {
+                return res.status(400).send("An unknown error occured");
+            }
+            return res.status(200).send("Successfully updated outfit");
+        }).catch(err => {
+            return res.status(400).send("An unknown error occured");
+        });        
+    });
 }

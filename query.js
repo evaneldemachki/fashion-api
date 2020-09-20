@@ -10,7 +10,8 @@ module.exports = class Query {
             },
             "User": {
                 "Credentials": ctx.db.db("User").collection("Credentials"),
-                "Data": ctx.db.db("User").collection("Data")
+                "Data": ctx.db.db("User").collection("Data"),
+                "Outfits": ctx.db.db("User").collection("Outfits")
             }
         }
     }
@@ -91,6 +92,7 @@ module.exports = class Query {
                     likes: [],
                     dislikes: [],
                     wardrobe: [],
+                    outfits: [],
                     img: "http://fashionapi.herokuapp.com/placeholder.png"
                 };
 
@@ -102,6 +104,60 @@ module.exports = class Query {
                 reject(err);
             });   
         })
+    }
+
+    addOutfit(dataID, itemArray) {
+        return new Promise((resolve, reject) => {
+            this.db.User.Data.findOne(
+                { _id: ObjectID(dataID) }
+            )
+            .then(data => {
+                if (!data) reject();
+                return data;
+            })
+            .then(data => {
+                let outfitID = new ObjectID();
+                this.db.User.Data.updateOne(
+                    { _id: ObjectID(dataID) },
+                    { $push: { outfits: outfitID } },
+                    { upsert: false } 
+                ).then(data => {
+                    let items = [];
+                    for(let i = 0; i < itemArray.length; i++) {
+                        items.push(ObjectID(itemArray[i]));
+                    }
+                    return this.db.User.Outfits.insertOne({ _id: outfitID, items });
+                }).then(data => {
+                    let insertedCount = data.insertedCount;
+                    resolve(insertedCount);
+                }).catch(err => {
+                    reject(err);
+                });
+            }).catch(err => {
+                reject(err);
+            });
+        });
+    }
+
+    updateOutfit(outfitID, itemArray) {
+        return new Promise((resolve, reject) => {
+            let items = [];
+            for(let i = 0; i < itemArray.length; i++) {
+                items.push(ObjectID(itemArray[i]));
+            }
+            this.db.User.Outfits.updateOne(
+                { _id: ObjectID(outfitID) },
+                { $set: { items } },
+                { upsert: false }
+            )
+            .then(data => {
+                let nModified = data.result.nModified;
+                resolve(nModified);
+            })
+            .catch(err => {
+                reject(err);
+            });
+        });
     }
 
     addProductAction(dataID, itemID, action) {
