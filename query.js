@@ -25,6 +25,14 @@ module.exports = class Query {
         });
     }
 
+    testPromise(cursor, i) {
+        return new Promise((resolve, reject) => {
+            cursor.toArray().then(res => {
+                resolve(res);
+            })
+        })
+    }
+
     fillOutfits(data) {
         return new Promise((resolve, reject) => {
             let outfits = [];
@@ -35,16 +43,30 @@ module.exports = class Query {
                 { _id: { $in: outfits } }
             ).toArray()
             .then(res => {
+                let item_objects = [];
                 for(let i = 0; i < res.length; i++) {
-                    let cursor = this.db.User.Outfits.find(
-                        { _id: { $in: res[i].items } }
+                    let items = [];
+                    for(let j = 0; j < res[i].items.length; j++) {
+                        items.push(ObjectID(res[i].items[j]));
+                    }
+
+                    let cursor = this.db.Apparel.Items.find(
+                        { _id: { $in: items } }
                     );
-                    data.outfits[i] = this.fillWithPromise(res[i], "items", cursor);
+                    item_objects.push(this.testPromise(cursor, i));
                 }
-                Promise.all(res).then(res => {
-                    data.outfits = res;
-                    resolve(data);
-                })
+
+                return Promise.all(item_objects)
+            })
+            .then(item_objects => {
+                for(let i = 0; i < data.outfits.length; i++) {
+                    //console.log(items[i])
+                    data.outfits[i] = {
+                        _id: data.outfits[i], 
+                        items: item_objects[i]
+                    }
+                }
+                resolve(data)                             
             })
             .catch(err => {
                 throw err;
