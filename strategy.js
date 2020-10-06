@@ -7,8 +7,9 @@ const passwordHash = require('password-hash');
 
 module.exports = function(passport, query) {
     passport.use(new LocalStrategy(
-        function(username, password, done) {
-            query.getUserCredentials(username).then(cred => {
+        {usernameField: "email", passwordField: "password"},
+        function(email, password, done) {
+            query.getUserCredentials(email).then(cred => {
                 if(!cred) {
                     return done(null, false, { message: "User does not exist"});
                 }
@@ -27,6 +28,6 @@ module.exports = function(passport, query) {
     //opts.issuer = 'accounts.examplesoft.com';
     //opts.audience = 'yoursite.net';
     passport.use(new JwtStrategy(opts, function(jwt_payload, done) {
-        return done(null, jwt_payload.data);
+        return done(null, jwt_payload);
     }));
 }

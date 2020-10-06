@@ -74,21 +74,63 @@ module.exports = class Query {
         })
     }
 
-    getUserCredentials(username) {
-        let promise = new Promise((resolve, reject) => {
+    getUserCredentials(email) {
+        return new Promise((resolve, reject) => {
             let cursor = this.db.User.Credentials.findOne(
-                { username }, function(err, res) {
+                { email }, function(err, res) {
                     if (err) reject(err);
                     resolve(res);
                 }
             );
         });
+    }
 
-        return promise;
+    getUserCredentialsByID(userID) {
+        return new Promise((resolve, reject) => {
+            let cursor = this.db.User.Credentials.findOne(
+                { _id: ObjectID(userID) }, function(err, res) {
+                    if (err) reject(err);
+                    resolve(res);
+                }
+            )
+        })
+    }
+
+    // TODO: this shouldn't be it's own function
+    listFriendsPromise(userIDArray) {
+        return this.db.User.Credentials.find(
+            { _id: { $in: userIDArray } },
+            { fields: { email: 0, password: 0, data: 0 } }
+        );
+    }
+
+    getFriendData(userID) {
+        return new Promise((resolve, reject) => {
+            this.db.User.Credentials.findOne(
+                { _id: ObjectID(userID) }
+            )
+            .then(cred => {
+                if (!cred) resolve();
+                let dataID = cred.data;
+
+                return this.db.User.Data.findOne(
+                    { _id: ObjectID(dataID) },
+                    { fields: { _id: 0, likes: 0, dislikes: 0, requests: 0, pending: 0, wardrobe: 0 } }
+                )
+            })
+            .then(data => {
+                if (!data) reject("An unknown error occured");
+                return this.fillOutfits(data);
+            }).then(data => {
+                resolve(data);
+            }).catch(err => {
+                reject(err);
+            })       
+        })
     }
 
     getUserData(dataID) {
-        let promise = new Promise((resolve, reject) => {
+        return new Promise((resolve, reject) => {
             this.db.User.Data.findOne(
                 { _id: ObjectID(dataID) }
             )
@@ -119,28 +161,117 @@ module.exports = class Query {
                 return this.fillOutfits(data);
             })
             .then(data => {
+                let cursor = this.listFriendsPromise(data.friends);
+                return this.fillWithPromise(data, "friends", cursor);
+            })
+            .then(data => {
+                console.log(data);
                 resolve(data);
             })
             .catch(err => {
+                console.log(err)
                 reject(err);
             });
         });
-
-        return promise;
     }
 
-    addUserCredentials(username, password) {
+    usernameExists(username) {
+        return new Promise((resolve, reject) => {
+            this.db.User.Credentials.findOne({ username })
+            .then(res => {
+                if(res) {
+                    resolve(true);
+                } else {
+                    resolve(false);
+                }
+            })
+        })
+    }
+
+    requestFriend(sendingID, recievingID) {
+        return new Promise((resolve, reject) => {
+            Promise.all([
+                this.getUserCredentialsByID(sendingID),
+                this.getUserCredentialsByID(recievingID)
+            ])
+            .then(cred => {
+                console.log(cred)
+                return Promise.all([
+                    this.getUserData(cred[0].data),
+                    this.getUserData(cred[1].data)
+                ]);
+            })
+            .then(data => {
+                console.log(data);
+                let friends = [];
+                for(let i = 0; i < data[0].friends.length; i += 1) {
+                    friends.push(data[0].friends[i].toHexString());
+                }
+                console.log(friends)
+                if(friends.includes(recievingID)) {
+                    reject("users are already friends");
+                    return; 
+                }
+                let pending = [];
+                for(let i = 0; i < data[0].pending.length; i += 1) {
+                    pending.push(data[0].pending[i].toHexString());
+                }
+
+                let sendingPayload;
+                let recievingPayload;
+                // if userID in pending: user has already been requested
+                if(pending.includes(recievingID)) {
+                    sendingPayload = { 
+                        $addToSet: { friends: ObjectID(recievingID) },
+                        $pull: { pending: ObjectID(recievingID) }
+                    }
+                    recievingPayload = {
+                        $addToSet: { friends: ObjectID(sendingID) },
+                        $pull: { requests: ObjectID(sendingID) }
+                    }
+                } else { // if userID not in pending: user has not been requested
+                    sendingPayload = { 
+                        $addToSet: { requests: ObjectID(recievingID) }
+                    }
+                    recievingPayload = {
+                        $addToSet: { pending: ObjectID(sendingID) }
+                    }
+                }
+
+                return Promise.all([
+                    this.db.User.Data.updateOne(
+                        { _id: ObjectID(data[0]._id) },
+                        sendingPayload,
+                        { upsert: false }
+                    ).then(update => {return update;}),
+                    this.db.User.Data.updateOne(
+                        { _id: ObjectID(data[1]._id) },
+                        recievingPayload,
+                        { upsert: false }
+                    ).then(update => {return update;})
+                ]);                
+            })
+            .then(updates => {
+                let nModified = [updates[0].result.nModified, updates[1].result.nModified];
+                resolve(nModified);
+            })
+            .catch(err => {
+                reject(err);
+            })
+        });
+    }
+
+    addUserCredentials(doc) {
         return new Promise((resolve, reject) => {
             let dataID = new ObjectID();
-            let doc = {
-                username, password,
-                data: dataID
-            };
 
             this.db.User.Credentials.insertOne(doc)
             .then(res => {
                 let data = {
                     _id: dataID,
+                    friends: [],
+                    requested: [],
+                    pending: [],
                     likes: [],
                     dislikes: [],
                     wardrobe: [],

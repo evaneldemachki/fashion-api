@@ -11,9 +11,10 @@ module.exports = function(server, query) {
             }
 
             let token = jwt.sign(
-                {data: user.data}, 
+                {data: user.data, id: user._id},
                 'secret', 
-                {expiresIn: "24h"})
+                {expiresIn: "24h"}
+            )
 
             return res.status(200).send(token);         
             
@@ -21,36 +22,77 @@ module.exports = function(server, query) {
     });
 
     server.post('/user/register', (req, res) => {
-        query.getUserCredentials(req.body["username"])
+        query.getUserCredentials(req.body.email)
         .then(cred => {
             if (cred) {
-                res.status(400).send("User already exists");
-                return true;
+                throw new Error("Email already exists");
             }
-            return false;
         })
-        .then(exists => {
-            if(exists) {
-                return;
-            }
+        .then(() => {
+            query.usernameExists(req.body.username)
+            .then(exists => {
+                if(exists) {
+                    throw new Error("Username already exists");
+                }
+            });
             let password = passwordHash.generate(req.body["password"]);
-            return query.addUserCredentials(req.body["username"], password);
-        }).then(nInserted => {
+            return query.addUserCredentials({
+                email: req.body.email,
+                username: req.body.username,
+                first_name: req.body.first_name,
+                last_name: req.body.last_name,
+                password
+            });
+        })
+        .then(nInserted => {
             if(nInserted == 0) {
-                return res.status(400).send("An unknown error occurred");
+                throw new Error("An unknown error occurred");
             }
             return res.status(200).send("Successfully added new user");
         })
         .catch(err => {
-            return res.status(400).send("An unknown error occurred");
+            return res.status(400).send(err);
         });   
+    });
+
+    server.post('/user/add-friend', passport.authenticate('jwt', { session: false }),
+    function(req, res) {
+        let sendingID = req.user.id;
+        let recievingID = req.body["id"]
+        
+        query.requestFriend(sendingID, recievingID)
+        .then(updates => {
+            if (updates[0] == updates[1] == 0) {
+                res.status(200).send("Friend request already sent");
+            } else {
+                res.status(200).send("Success");
+            }
+        })
+        .catch(err => {
+            res.status(400).send(err)
+        })
+    });
+
+    server.post('/user/friend', passport.authenticate('jwt', { session: false }),
+    function(req, res) {
+        let userID = req.body.id;
+        // TODO: verify users are friends / account is public
+        query.getFriendData(userID).then(data => {
+            if (data) {
+                return res.status(200).send(data);
+            } else {
+                return res.status(400).send("User data not found");
+            }
+        }).catch(err => {
+            return res.status(400).send("An unknown error occured");
+        }); 
     });
 
 
     server.post('/user/data', passport.authenticate('jwt', { session: false }),
         function(req, res) {
-            let dataID = req.user; // not sure why it always resolves to .user
- 
+            let dataID = req.user.data;
+
             query.getUserData(dataID).then(data => {
                 if (data) {
                     return res.status(200).send(data);
@@ -65,7 +107,7 @@ module.exports = function(server, query) {
 
     server.post('/user/action', passport.authenticate('jwt', { session: false }),
     function(req, res) {
-        let dataID = req.user;
+        let dataID = req.user.data;
         if(!Object.keys(req.body).includes("item")) {
             return res.status(400).send("Must provide key: 'item'");
         }
@@ -89,7 +131,7 @@ module.exports = function(server, query) {
 
     server.post('/user/add-outfit', passport.authenticate('jwt', { session: false }),
     function(req, res) {
-        let dataID = req.user;
+        let dataID = req.user.data;
         if(!Object.keys(req.body).includes("items")) {
             return res.status(400).send("Must provide key: 'items'");
         }
@@ -103,7 +145,7 @@ module.exports = function(server, query) {
 
     server.post('/user/update-outfit', passport.authenticate('jwt', { session: false }),
     function(req, res) {
-        let dataID = req.user;
+        let dataID = req.user.data;
         if(!Object.keys(req.body).includes("outfit")) {
             return res.status(400).send("Must provide key: 'outfit'");
         }
