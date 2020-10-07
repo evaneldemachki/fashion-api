@@ -261,6 +261,43 @@ module.exports = class Query {
         });
     }
 
+    searchUsers(searchStr) {
+        if(searchStr == null) {
+            return new Promise((resolve, reject) => {
+                this.db.User.Credentials.find(
+                    {}, { fields: { email: 0, password: 0, data: 0 } }
+                ).toArray().then(users => {
+                    resolve(users);
+                }).catch(err => {
+                    reject(err);
+                });
+            });
+        } else {
+            return new Promise((resolve, reject) => {
+                this.db.User.Credentials.find(
+                    {
+                        $text: {
+                            $search: searchStr,
+                            $caseSensitive: false
+                        }
+                    }
+                )
+                .project(
+                    { 
+                        score: { $meta: "textScore" },
+                        email: 0, password: 0, data: 0
+                    }
+                )
+                .sort({ score: { $meta: "textScore" }})
+                .toArray().then(users => {
+                    resolve(users);
+                }).catch(err => {
+                    reject(err);
+                });
+            })
+        }
+    }
+
     addUserCredentials(doc) {
         return new Promise((resolve, reject) => {
             let dataID = new ObjectID();

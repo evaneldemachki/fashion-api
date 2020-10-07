@@ -3,6 +3,17 @@ const jwt = require("jsonwebtoken");
 const passwordHash = require('password-hash');
 
 module.exports = function(server, query) {
+    server.get('/user/search', passport.authenticate('jwt', { session: false }),
+    function(req, res) {
+        let term = null;
+        if(req.query.term) {
+            term = req.query.term;
+        }
+        query.searchUsers(term).then(users => {
+            return res.status(200).send(users);
+        })
+    });
+
     server.post('/user/login', (req, res, next) => {
         passport.authenticate('local', function(err, user, info) {
             if (err) { return next(err); }
