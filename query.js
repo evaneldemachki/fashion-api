@@ -301,6 +301,7 @@ module.exports = class Query {
     addUserCredentials(doc) {
         return new Promise((resolve, reject) => {
             let dataID = new ObjectID();
+            doc["data"] = dataID;
 
             this.db.User.Credentials.insertOne(doc)
             .then(res => {
