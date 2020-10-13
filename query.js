@@ -104,6 +104,21 @@ module.exports = class Query {
         );
     }
 
+    getPublicUserCredentials(userID) {
+        return new Promise((resolve, reject) => {
+            this.db.User.Credentials.findOne(
+                { _id: ObjectID(userID) },
+                { fields: { password: 0, email: 0, data: 0 } }
+            )
+            .then(cred => {
+                resolve(cred);
+            })
+            .catch(err => {
+                reject(err);
+            });
+        });
+    }
+
     getFriendData(userID) {
         return new Promise((resolve, reject) => {
             this.db.User.Credentials.findOne(

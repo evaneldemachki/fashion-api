@@ -102,11 +102,19 @@ module.exports = function(server, query) {
 
     server.post('/user/data', passport.authenticate('jwt', { session: false }),
         function(req, res) {
+            let userID = req.user.id;
             let dataID = req.user.data;
 
             query.getUserData(dataID).then(data => {
                 if (data) {
-                    return res.status(200).send(data);
+                    query.getPublicUserCredentials(userID)
+                    .then(cred => {
+                        let response = Object.assign(data, cred);
+                        return res.status(200).send(response);
+                    })
+                    .catch(err => {
+                        res.status(400).send("User credentials not found");
+                    });
                 } else {
                     return res.status(400).send("User data not found");
                 }
