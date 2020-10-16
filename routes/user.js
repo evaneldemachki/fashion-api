@@ -95,6 +95,7 @@ module.exports = function(server, query) {
                 return res.status(400).send("User data not found");
             }
         }).catch(err => {
+            console.log(err);
             return res.status(400).send("An unknown error occured");
         }); 
     });

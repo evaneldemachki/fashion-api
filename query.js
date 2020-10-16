@@ -18,8 +18,17 @@ module.exports = class Query {
 
     fillWithPromise(obj, key, cursor) {
         return new Promise((resolve, reject) => {
-            cursor.toArray().then(res => {
+            cursor.then(res => {
                 obj[key] = res;
+                resolve(obj);
+            });
+        });
+    }
+
+    fillWithPromiseAtKey(obj, key, cursor) {
+        return new Promise((resolve, reject) => {
+            cursor.then(res => {
+                obj[key] = res[key];
                 resolve(obj);
             });
         });
@@ -60,7 +69,6 @@ module.exports = class Query {
             })
             .then(item_objects => {
                 for(let i = 0; i < data.outfits.length; i++) {
-                    //console.log(items[i])
                     data.outfits[i] = {
                         _id: data.outfits[i], 
                         items: item_objects[i]
@@ -93,15 +101,31 @@ module.exports = class Query {
                     resolve(res);
                 }
             )
-        })
+        });
     }
 
-    // TODO: this shouldn't be it's own function
     listFriendsPromise(userIDArray) {
-        return this.db.User.Credentials.find(
-            { _id: { $in: userIDArray } },
-            { fields: { email: 0, password: 0, data: 0 } }
-        );
+        return new Promise((resolve, reject) => {
+            this.db.User.Credentials.find({ _id: { $in: userIDArray }})
+            .project({ email: 0, password: 0 }).toArray()
+            .then(credArray => {
+                for(let i=0; i < credArray.length; i++) {
+                    let cursor = this.db.User.Data.findOne({ _id: credArray[i].data });
+                    credArray[i] = this.fillWithPromiseAtKey(credArray[i], "img", cursor)
+                }
+                
+                return Promise.all(credArray);
+            })
+            .then(credArray => {
+                for(let i=0; i < credArray.length; i++) {
+                    delete credArray[i].data;
+                }
+                resolve(credArray);
+            })
+            .catch(err => {
+                reject(err);
+            });
+        });
     }
 
     getPublicUserCredentials(userID) {
@@ -122,7 +146,8 @@ module.exports = class Query {
     getFriendData(userID) {
         return new Promise((resolve, reject) => {
             this.db.User.Credentials.findOne(
-                { _id: ObjectID(userID) }
+                { _id: ObjectID(userID) },
+                { fields: { password: 0, email: 0 } }
             )
             .then(cred => {
                 if (!cred) resolve();
@@ -130,18 +155,33 @@ module.exports = class Query {
 
                 return this.db.User.Data.findOne(
                     { _id: ObjectID(dataID) },
-                    { fields: { _id: 0, likes: 0, dislikes: 0, requests: 0, pending: 0, wardrobe: 0 } }
+                    { fields: { _id: 0, dislikes: 0, requests: 0, pending: 0, wardrobe: 0 } }
                 )
+                .then(data => {
+                    return Object.assign(cred, data);
+                })
+            })
+            .then(data => {
+                let cursor = this.db.Apparel.Items.find(
+                    { _id: { $in: data.likes } }
+                ).toArray();
+
+                return this.fillWithPromise(data, "likes", cursor);
             })
             .then(data => {
                 if (!data) reject("An unknown error occured");
                 return this.fillOutfits(data);
-            }).then(data => {
-                resolve(data);
+            })
+            .then(data => {
+                this.listFriendsPromise(data.friends).then(friends => {
+                    data.friends = friends;
+                    delete data.data
+                    resolve(data);
+                });
             }).catch(err => {
                 reject(err);
-            })       
-        })
+            });       
+        });
     }
 
     getUserData(dataID) {
@@ -153,22 +193,22 @@ module.exports = class Query {
                 if (!data) resolve(data);
 
                 let cursor = this.db.Apparel.Items.find(
-                    { _id: {$in: data.likes} }
-                );
+                    { _id: { $in: data.likes } }
+                ).toArray();
 
                 return this.fillWithPromise(data, "likes", cursor);
             })
             .then(data => {
                 let cursor = this.db.Apparel.Items.find(
-                    { _id: {$in: data.dislikes} }
-                );
+                    { _id: { $in: data.dislikes } }
+                ).toArray();
 
                 return this.fillWithPromise(data, "dislikes", cursor);
             })
             .then(data => {
                 let cursor = this.db.Apparel.Items.find(
                     { _id: { $in: data.wardrobe } }
-                );
+                ).toArray();
 
                 return this.fillWithPromise(data, "wardrobe", cursor);
             })
@@ -180,11 +220,17 @@ module.exports = class Query {
                 return this.fillWithPromise(data, "friends", cursor);
             })
             .then(data => {
-                console.log(data);
+                let cursor = this.listFriendsPromise(data.requests);
+                return this.fillWithPromise(data, "requests", cursor);
+            })
+            .then(data => {
+                let cursor = this.listFriendsPromise(data.pending);
+                return this.fillWithPromise(data, "pending", cursor);
+            })
+            .then(data => {
                 resolve(data);
             })
             .catch(err => {
-                console.log(err)
                 reject(err);
             });
         });
@@ -210,19 +256,16 @@ module.exports = class Query {
                 this.getUserCredentialsByID(recievingID)
             ])
             .then(cred => {
-                console.log(cred)
                 return Promise.all([
                     this.getUserData(cred[0].data),
                     this.getUserData(cred[1].data)
                 ]);
             })
             .then(data => {
-                console.log(data);
                 let friends = [];
                 for(let i = 0; i < data[0].friends.length; i += 1) {
                     friends.push(data[0].friends[i].toHexString());
                 }
-                console.log(friends)
                 if(friends.includes(recievingID)) {
                     reject("users are already friends");
                     return; 
