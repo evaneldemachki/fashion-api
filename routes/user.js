@@ -66,15 +66,33 @@ module.exports = function(server, query) {
         });   
     });
 
-    server.post('/user/add-friend', passport.authenticate('jwt', { session: false }),
+    server.post('/user/follow', passport.authenticate('jwt', { session: false }),
     function(req, res) {
         let sendingID = req.user.id;
         let recievingID = req.body["id"]
         
-        query.requestFriend(sendingID, recievingID)
+        query.social.follow(sendingID, recievingID)
         .then(updates => {
             if (updates[0] == updates[1] == 0) {
-                res.status(200).send("Friend request already sent");
+                res.status(400).send("An unknown error occured");
+            } else {
+                res.status(200).send("Success");
+            }
+        })
+        .catch(err => {
+            res.status(400).send(err.message)
+        });
+    });
+
+    server.post('/user/unfollow', passport.authenticate('jwt', { session: false }),
+    function(req, res) {
+        let sendingID = req.user.id;
+        let recievingID = req.body["id"]
+        
+        query.social.unfollow(sendingID, recievingID)
+        .then(updates => {
+            if ( (updates[0] == 0) || (updates[1] == 0) ) {
+                res.status(400).send("An unknown error occured");
             } else {
                 res.status(200).send("Success");
             }
@@ -84,10 +102,47 @@ module.exports = function(server, query) {
         })
     });
 
-    server.post('/user/friend', passport.authenticate('jwt', { session: false }),
+    
+    server.post('/user/accept-follow', passport.authenticate('jwt', { session: false }),
+    function(req, res) {
+        let sendingID = req.user.id;
+        let recievingID = req.body["id"]
+        
+        query.social.acceptFollow(sendingID, recievingID)
+        .then(updates => {
+            if (updates[0] == updates[1] == 0) {
+                res.status(400).send("An unknown error occured");
+            } else {
+                res.status(200).send("Success");
+            }
+        })
+        .catch(err => {
+            res.status(400).send(err.message)
+        });
+    });
+
+    server.post('/user/reject-follow', passport.authenticate('jwt', { session: false }),
+    function(req, res) {
+        let sendingID = req.user.id;
+        let recievingID = req.body["id"]
+        
+        query.social.rejectFollow(sendingID, recievingID)
+        .then(updates => {
+            if (updates[0] == updates[1] == 0) {
+                res.status(400).send("An unknown error occured");
+            } else {
+                res.status(200).send("Success");
+            }
+        })
+        .catch(err => {
+            res.status(400).send(err.message)
+        });
+    });
+
+    server.post('/user/followed-data', passport.authenticate('jwt', { session: false }),
     function(req, res) {
         let userID = req.body.id;
-        // TODO: verify users are friends / account is public
+        // TODO: verify user is not private / user is followed
         query.getFriendData(userID).then(data => {
             if (data) {
                 return res.status(200).send(data);

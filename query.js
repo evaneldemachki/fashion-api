@@ -1,4 +1,4 @@
-const e = require("express");
+const Social = require('./social');
 
 const ObjectID = require("mongodb").ObjectID;
 
@@ -13,7 +13,9 @@ module.exports = class Query {
                 "Data": ctx.db.db("User").collection("Data"),
                 "Outfits": ctx.db.db("User").collection("Outfits")
             }
-        }
+        };
+
+        this.social = new Social(this.db, this);
     }
 
     fillWithPromise(obj, key, cursor) {
@@ -104,7 +106,7 @@ module.exports = class Query {
         });
     }
 
-    listFriendsPromise(userIDArray) {
+    listSocialPromise(userIDArray) {
         return new Promise((resolve, reject) => {
             this.db.User.Credentials.find({ _id: { $in: userIDArray }})
             .project({ email: 0, password: 0 }).toArray()
@@ -155,30 +157,37 @@ module.exports = class Query {
 
                 return this.db.User.Data.findOne(
                     { _id: ObjectID(dataID) },
-                    { fields: { _id: 0, dislikes: 0, requests: 0, pending: 0, wardrobe: 0 } }
+                    { fields: { _id: 0, requested: 0, pending: 0, wardrobe: 0 } }
                 )
                 .then(data => {
                     return Object.assign(cred, data);
                 })
             })
-            .then(data => {
+            .then(data => { // populate LIKES field
                 let cursor = this.db.Apparel.Items.find(
                     { _id: { $in: data.likes } }
                 ).toArray();
 
                 return this.fillWithPromise(data, "likes", cursor);
             })
-            .then(data => {
+            .then(data => { // populae OUTFITS field
                 if (!data) reject("An unknown error occured");
                 return this.fillOutfits(data);
             })
-            .then(data => {
-                this.listFriendsPromise(data.friends).then(friends => {
-                    data.friends = friends;
+            .then(data => { // populate FOLLOWING field
+                return this.listSocialPromise(data.following).then(following => {
+                    data.following = following;
+                    return data;
+                });
+            })
+            .then(data => { // populate FOLLOWERS field
+                this.listSocialPromise(data.followers).then(followers => {
+                    data.followers = followers;
                     delete data.data
                     resolve(data);
-                });
-            }).catch(err => {
+                });                
+            })
+            .catch(err => {
                 reject(err);
             });       
         });
@@ -189,7 +198,7 @@ module.exports = class Query {
             this.db.User.Data.findOne(
                 { _id: ObjectID(dataID) }
             )
-            .then(data => {
+            .then(data => { // populate LIKES field
                 if (!data) resolve(data);
 
                 let cursor = this.db.Apparel.Items.find(
@@ -198,33 +207,30 @@ module.exports = class Query {
 
                 return this.fillWithPromise(data, "likes", cursor);
             })
-            .then(data => {
-                let cursor = this.db.Apparel.Items.find(
-                    { _id: { $in: data.dislikes } }
-                ).toArray();
-
-                return this.fillWithPromise(data, "dislikes", cursor);
-            })
-            .then(data => {
+            .then(data => { // populate WARDROBE field
                 let cursor = this.db.Apparel.Items.find(
                     { _id: { $in: data.wardrobe } }
                 ).toArray();
 
                 return this.fillWithPromise(data, "wardrobe", cursor);
             })
-            .then(data => {
+            .then(data => { // populate OUTFITS field
                 return this.fillOutfits(data);
             })
-            .then(data => {
-                let cursor = this.listFriendsPromise(data.friends);
-                return this.fillWithPromise(data, "friends", cursor);
+            .then(data => { // populate FOLLOWING field
+                let cursor = this.listSocialPromise(data.following);
+                return this.fillWithPromise(data, "following", cursor);
             })
-            .then(data => {
-                let cursor = this.listFriendsPromise(data.requests);
-                return this.fillWithPromise(data, "requests", cursor);
+            .then(data => { // populate FOLLOWERS field
+                let cursor = this.listSocialPromise(data.followers);
+                return this.fillWithPromise(data, "followers", cursor);
             })
-            .then(data => {
-                let cursor = this.listFriendsPromise(data.pending);
+            .then(data => { // populate REQUESTED field
+                let cursor = this.listSocialPromise(data.requested);
+                return this.fillWithPromise(data, "requested", cursor);
+            })
+            .then(data => { // populate PENDING field
+                let cursor = this.listSocialPromise(data.pending);
                 return this.fillWithPromise(data, "pending", cursor);
             })
             .then(data => {
@@ -247,76 +253,6 @@ module.exports = class Query {
                 }
             })
         })
-    }
-
-    requestFriend(sendingID, recievingID) {
-        return new Promise((resolve, reject) => {
-            Promise.all([
-                this.getUserCredentialsByID(sendingID),
-                this.getUserCredentialsByID(recievingID)
-            ])
-            .then(cred => {
-                return Promise.all([
-                    this.getUserData(cred[0].data),
-                    this.getUserData(cred[1].data)
-                ]);
-            })
-            .then(data => {
-                let friends = [];
-                for(let i = 0; i < data[0].friends.length; i += 1) {
-                    friends.push(data[0].friends[i].toHexString());
-                }
-                if(friends.includes(recievingID)) {
-                    reject("users are already friends");
-                    return; 
-                }
-                let pending = [];
-                for(let i = 0; i < data[0].pending.length; i += 1) {
-                    pending.push(data[0].pending[i].toHexString());
-                }
-
-                let sendingPayload;
-                let recievingPayload;
-                // if userID in pending: user has already been requested
-                if(pending.includes(recievingID)) {
-                    sendingPayload = { 
-                        $addToSet: { friends: ObjectID(recievingID) },
-                        $pull: { pending: ObjectID(recievingID) }
-                    }
-                    recievingPayload = {
-                        $addToSet: { friends: ObjectID(sendingID) },
-                        $pull: { requests: ObjectID(sendingID) }
-                    }
-                } else { // if userID not in pending: user has not been requested
-                    sendingPayload = { 
-                        $addToSet: { requests: ObjectID(recievingID) }
-                    }
-                    recievingPayload = {
-                        $addToSet: { pending: ObjectID(sendingID) }
-                    }
-                }
-
-                return Promise.all([
-                    this.db.User.Data.updateOne(
-                        { _id: ObjectID(data[0]._id) },
-                        sendingPayload,
-                        { upsert: false }
-                    ).then(update => {return update;}),
-                    this.db.User.Data.updateOne(
-                        { _id: ObjectID(data[1]._id) },
-                        recievingPayload,
-                        { upsert: false }
-                    ).then(update => {return update;})
-                ]);                
-            })
-            .then(updates => {
-                let nModified = [updates[0].result.nModified, updates[1].result.nModified];
-                resolve(nModified);
-            })
-            .catch(err => {
-                reject(err);
-            })
-        });
     }
 
     searchUsers(searchStr) {
@@ -365,14 +301,16 @@ module.exports = class Query {
             .then(res => {
                 let data = {
                     _id: dataID,
-                    friends: [],
+                    following: [],
+                    followers: [],
                     requested: [],
                     pending: [],
                     likes: [],
                     dislikes: [],
                     wardrobe: [],
                     outfits: [],
-                    img: "http://fashionapi.herokuapp.com/placeholder.png"
+                    img: "http://fashionapi.herokuapp.com/placeholder.png",
+                    private: false
                 };
 
                 return this.db.User.Data.insertOne(data);
