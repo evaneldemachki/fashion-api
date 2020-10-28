@@ -76,7 +76,7 @@ module.exports = class Query {
                         items: item_objects[i]
                     }
                 }
-                resolve(data)                             
+                resolve(data);                           
             })
             .catch(err => {
                 throw err;
@@ -343,7 +343,13 @@ module.exports = class Query {
                     for(let i = 0; i < itemArray.length; i++) {
                         items.push(ObjectID(itemArray[i]));
                     }
-                    return this.db.User.Outfits.insertOne({ _id: outfitID, items });
+                    return this.db.User.Outfits.insertOne(
+                        {
+                            _id: outfitID,
+                            timestamp: new Date(),
+                            items
+                        }
+                    );
                 }).then(data => {
                     let insertedCount = data.insertedCount;
                     if(insertedCount > 0) {
