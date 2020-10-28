@@ -139,7 +139,7 @@ module.exports = function(server, query) {
         });
     });
 
-    server.post('/user/followed-data', passport.authenticate('jwt', { session: false }),
+    server.post('/user/user-data', passport.authenticate('jwt', { session: false }),
     function(req, res) {
         let userID = req.body.id;
         // TODO: verify user is not private / user is followed
