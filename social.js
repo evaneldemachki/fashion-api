@@ -44,7 +44,6 @@ module.exports = class Social {
                 ).then(update => { return update; })
             ])
             .then(data => { 
-                console.log(data);
                 resolve(data); })
             .catch(err => { 
                 console.log(err);
@@ -68,7 +67,6 @@ module.exports = class Social {
                 // check if recieving user has private account
                 if(data[1].private == true) { // perform checks / send request
                     // check if sending user already requested to follow recieving user
-                    console.log(data)
                     let requested = [];
                     for(let i = 0; i < data[0].requested.length; i += 1) {
                         requested.push(data[0].requested[i]._id.toHexString());

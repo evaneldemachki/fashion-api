@@ -238,4 +238,20 @@ module.exports = function(server, query) {
             return res.status(400).send("An unknown error occured");
         });        
     });
+
+    server.post('/user/outfits', passport.authenticate('jwt', { session: false }),
+    function(req, res) {
+        let outfitIDs = req.body.ids;
+        query.expandOutfits(outfitIDs).then(data => {
+            if(data) {
+                return res.status(200).send(data);
+            } else {
+                return res.status(400).send("Outfits not found")
+            }
+        })
+        .catch(err => {
+            return res.status(400).send("An unknown error occured");
+        })
+
+    });
 }

@@ -44,6 +44,47 @@ module.exports = class Query {
         })
     }
 
+    expandOutfits(outfitIDs) {
+        return new Promise((resolve, reject) => {
+            let outfits = [];
+            for(let i = 0; i < outfitIDs.length; i++) {
+                outfits.push(ObjectID(outfitIDs[i]));
+            }
+            this.db.User.Outfits.find(
+                { _id: { $in: outfits } }
+            ).toArray()
+            .then(res => {
+                let item_objects = [];
+                for(let i = 0; i < res.length; i++) {
+                    let items = [];
+                    for(let j = 0; j < res[i].items.length; j++) {
+                        items.push(ObjectID(res[i].items[j]));
+                    }
+
+                    let cursor = this.db.Apparel.Items.find(
+                        { _id: { $in: items } }
+                    );
+                    item_objects.push(this.testPromise(cursor, i));
+                }
+
+                return Promise.all(item_objects)
+            })
+            .then(item_objects => {
+                let data = [];
+                for(let i = 0; i < outfits.length; i++) {
+                    data[i] = {
+                        _id: outfitIDs[i], 
+                        items: item_objects[i]
+                    }
+                }
+                resolve(data);                           
+            })
+            .catch(err => {
+                throw err;
+            })
+        })
+    }
+
     fillOutfits(data) {
         return new Promise((resolve, reject) => {
             let outfits = [];
