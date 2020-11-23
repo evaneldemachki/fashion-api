@@ -108,15 +108,19 @@ module.exports = class Query {
                     item_objects.push(this.testPromise(cursor, i));
                 }
 
-                return Promise.all(item_objects)
-            })
-            .then(item_objects => {
-                for(let i = 0; i < data.outfits.length; i++) {
-                    data.outfits[i] = {
-                        _id: data.outfits[i], 
-                        items: item_objects[i]
+                return Promise.all(item_objects).then(obj_array => {
+                    for(let i = 0; i < data.outfits.length; i++) {
+                        data.outfits[i] = {
+                            _id: data.outfits[i],
+                            timestamp: res[i].timestamp, 
+                            items: obj_array[i]
+                        }
                     }
-                }
+                    
+                    return data;
+                })
+            })
+            .then(data => {
                 resolve(data);                           
             })
             .catch(err => {
